@@ -74,10 +74,10 @@ BASE_DIR = Path(__file__).resolve().parent
 #  Agar kuch bhi na mile — script run karte waqt terminal pe
 #  poochh lega (SSH/local pe kaam karta hai).
 # ─────────────────────────────────────────────────────────────────
-BOT_TOKEN_HARDCODED = ""   # ← optional: apna token yahan paste karo
+BOT_TOKEN_HARDCODED = "8600557449:AAEhPPDrdxwcjE_T40WGyfXCdeVybGKbDM0"   # ← optional: apna token yahan paste karo
 
 # Same for owner (optional, but recommended)
-OWNER_ID_HARDCODED  = 0    # ← optional: apna telegram user id
+OWNER_ID_HARDCODED  = 8662511212    # ← optional: apna telegram user id
 
 
 def _load_json_cfg() -> Dict[str, Any]:
