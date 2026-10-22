@@ -61,23 +61,12 @@ from flask import Flask, jsonify
 
 
 # ═════════════════════════════════════════════════════════════════
-#  CONFIGURATION — EDIT THESE OR USE ENV VARS
+#  CONFIGURATION
 # ═════════════════════════════════════════════════════════════════
 BASE_DIR = Path(__file__).resolve().parent
 
-# ─────────────────────────────────────────────────────────────────
-#  BOT TOKEN — 4 tarike se set kar sakte ho (priority order):
-#    1. env var:       export BOT_TOKEN="123:ABC"
-#    2. config.json:   {"bot_token": "123:ABC", "owner_id": 12345}
-#    3. bot_token.txt: file mein sirf token likho
-#    4. niche paste:   BOT_TOKEN_HARDCODED = "123:ABC"
-#  Agar kuch bhi na mile — script run karte waqt terminal pe
-#  poochh lega (SSH/local pe kaam karta hai).
-# ─────────────────────────────────────────────────────────────────
-BOT_TOKEN_HARDCODED = "8600557449:AAEhPPDrdxwcjE_T40WGyfXCdeVybGKbDM0"   # ← optional: apna token yahan paste karo
-
-# Same for owner (optional, but recommended)
-OWNER_ID_HARDCODED  = 8662511212    # ← optional: apna telegram user id
+BOT_TOKEN_HARDCODED = "8600557449:AAHFBV2PNaBSgwTJ179pTM2PEHytsLjJHiA"
+OWNER_ID_HARDCODED  = 8662511212
 
 
 def _load_json_cfg() -> Dict[str, Any]:
@@ -94,15 +83,12 @@ _CFG = _load_json_cfg()
 
 
 def _resolve_token() -> str:
-    # 1. env var
     t = (os.environ.get("BOT_TOKEN") or "").strip()
     if t:
         return t
-    # 2. config.json
     t = str(_CFG.get("bot_token", "")).strip()
     if t:
         return t
-    # 3. bot_token.txt
     tf = BASE_DIR / "bot_token.txt"
     if tf.exists():
         try:
@@ -111,7 +97,6 @@ def _resolve_token() -> str:
                 return t
         except Exception:
             pass
-    # 4. hardcoded
     if BOT_TOKEN_HARDCODED.strip():
         return BOT_TOKEN_HARDCODED.strip()
     return ""
@@ -137,16 +122,10 @@ def _resolve_owner() -> int:
 
 TOKEN = _resolve_token()
 
-# ── Interactive prompt (first run, SSH/local only) ──
 if not TOKEN:
     if sys.stdin.isatty():
         print("=" * 60)
         print("  BOT TOKEN not configured.")
-        print("  Options (fastest first):")
-        print("    1. export BOT_TOKEN='123:ABC'   (env var)")
-        print("    2. create config.json:  {\"bot_token\": \"123:ABC\"}")
-        print("    3. create bot_token.txt with just the token")
-        print("    4. edit BOT_TOKEN_HARDCODED in this file")
         print("=" * 60)
         try:
             entered = input("Paste your bot token now (or Enter to exit): ").strip()
@@ -157,14 +136,7 @@ if not TOKEN:
             TOKEN = entered
             print("[setup] token saved to bot_token.txt")
     if not TOKEN:
-        sys.exit(
-            "[x] BOT_TOKEN not set.\n"
-            "    export BOT_TOKEN='123:ABC'\n"
-            "    or create config.json {\"bot_token\": \"123:ABC\"}\n"
-            "    or create bot_token.txt with the token inside\n"
-            "    or edit BOT_TOKEN_HARDCODED in this file"
-        )
-
+        sys.exit("[x] BOT_TOKEN not set.")
 
 OWNER_ID = _resolve_owner()
 
@@ -192,7 +164,7 @@ DB_FILE = DATA / "db.json"
 KEY_FILE = DATA / "keys.json"
 SALT_FILE = DATA / ".master_salt"
 
-BRAND = "ѕιмяαη нoѕтιηg"
+BRAND = "ꜱᴍ"
 FOOTER = f"\n\n<blockquote>{BRAND}</blockquote>"
 
 ENTRY_PY = ("bot.py", "main.py", "app.py", "run.py")
@@ -225,6 +197,60 @@ def esc(s: Any = "") -> str:
 
 def bullet(label: str, value: Any) -> str:
     return f"•  <b>{esc(label)}</b>: <code>{esc(value)}</code>"
+
+
+# ─── STYLED REPLY KEYBOARD BUILDER ──────────────────────────────
+def rbtn(text: str, style: Optional[str] = None,
+         **kw) -> types.KeyboardButton:
+    """Reply-keyboard button with optional color style (falls back gracefully)."""
+    kw2 = dict(kw)
+    if style:
+        try:
+            return types.KeyboardButton(text, **kw2, style=style)
+        except TypeError:
+            pass
+    b = types.KeyboardButton(text, **kw2)
+    if style:
+        try:
+            b.style = style
+        except Exception:
+            pass
+    return b
+
+
+def _rkb(rows: List[List[Tuple[str, Optional[str]]]]) -> types.ReplyKeyboardMarkup:
+    """Build a reply keyboard from rows of (label, style) tuples."""
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2,
+                                    is_persistent=True)
+    for row in rows:
+        btns = [rbtn(text, style=style) for text, style in row]
+        kb.add(*btns)
+    return kb
+
+
+# ─── REPLY KEYBOARD BUTTON LABELS ───────────────────────────────
+RB_MY_BOTS = "📂  " + sc("My Bots")
+RB_UPLOAD  = "⊕  " + sc("Upload")
+RB_HELP    = "?  " + sc("Help")
+RB_REFRESH = "↻  " + sc("Refresh")
+RB_BACK    = "↲  " + sc("Back")
+RB_MAIN    = "↲  " + sc("Main Menu")
+RB_START   = "▶  " + sc("Start")
+RB_STOP    = "■  " + sc("Stop")
+RB_RESTART = "↻  " + sc("Restart")
+RB_LOGS    = "▸  " + sc("Live Logs")
+RB_ENV     = "✎  " + sc("Env Vars")
+RB_DELETE  = "✖  " + sc("Delete")
+RB_YES_DEL = "✖  " + sc("Yes, Delete")
+RB_CANCEL  = "↲  " + sc("Cancel")
+RB_ADD_VAR = "⊕  " + sc("Add Variable")
+
+
+def _main_rkb() -> types.ReplyKeyboardMarkup:
+    return _rkb([
+        [(RB_MY_BOTS, "primary"), (RB_UPLOAD, "primary")],
+        [(RB_HELP, "success"), (RB_REFRESH, "success")],
+    ])
 
 
 # ─── UTIL ────────────────────────────────────────────────────────
@@ -320,7 +346,6 @@ def list_user_bots(uid: int) -> List[Dict[str, Any]]:
 
 
 # ─── CRYPTO ──────────────────────────────────────────────────────
-# Salt-based: even if BOT_TOKEN changes, existing bot files stay decryptable.
 _key_lock = threading.Lock()
 
 
@@ -394,9 +419,8 @@ def decrypt_file(enc_path: str, key_id: str) -> bytes:
 
 
 # ═════════════════════════════════════════════════════════════════
-#  AUTO-INSTALL MISSING MODULES (PIP / NPM)
+#  AUTO-INSTALL MISSING MODULES
 # ═════════════════════════════════════════════════════════════════
-# Common import name ≠ pip package mismatches
 PYPI_ALIAS: Dict[str, str] = {
     "telebot":      "pyTelegramBotAPI",
     "telegram":     "python-telegram-bot",
@@ -445,7 +469,6 @@ _MISSING_PAT_JS = re.compile(
 
 
 def _extract_missing(log_lines: List[str], kind: str) -> List[str]:
-    """Scan last N log lines for missing module errors."""
     pattern = _MISSING_PAT_PY if kind == "python" else _MISSING_PAT_JS
     found: List[str] = []
     seen: set = set()
@@ -500,10 +523,6 @@ def _npm_install_into_dir(bot_dir: Path, packages: List[str]) -> Tuple[bool, str
 
 def _try_auto_install(b: Dict[str, Any], kind: str,
                       log: List[str]) -> bool:
-    """
-    Try to pip/npm install missing modules found in log.
-    Returns True if at least one package was installed successfully.
-    """
     missing = _extract_missing(log, kind)
     if not missing:
         return False
@@ -680,9 +699,7 @@ def _drain_proc(bot_id: str, proc: subprocess.Popen, log: List[str],
         if not b:
             return
 
-        # ── AUTO-INSTALL MISSING MODULES ─────────────────────
         installed_any = _try_auto_install(b, kind, log)
-        # ─────────────────────────────────────────────────────
 
         if installed_any:
             attempts = 1
@@ -771,24 +788,6 @@ def start_bot(bot_id: str) -> Dict[str, Any]:
                      args=(bot_id, proc, log, kind),
                      daemon=True).start()
 
-    def _wipe():
-        time.sleep(6)
-        with _runner_lock:
-            cur = RUNNING.get(bot_id)
-            if not cur or cur.get("token") != start_token:
-                return
-        for f in bot_dir.rglob("*"):
-            if (".deps" in f.parts or "node_modules" in f.parts
-                    or "venv" in f.parts):
-                continue
-            if f.is_file() and f.suffix in (".py", ".js") \
-                    and f.name != "__init__.py":
-                try:
-                    f.write_bytes(b"# sandboxed\n")
-                except Exception:
-                    pass
-    threading.Thread(target=_wipe, daemon=True).start()
-
     return {"ok": True, "pid": proc.pid, "kind": kind}
 
 
@@ -859,79 +858,28 @@ def tail_log(bot_id: str, n: int = 40) -> str:
 
 # ─── BOT ─────────────────────────────────────────────────────────
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML", threaded=True, num_threads=4)
+
+# State machine per user:
+#   {"view": "main"}                          → main menu
+#   {"view": "bots", "bot_map": {...}}        → bot list
+#   {"view": "bot", "bot_id": "..."}          → bot actions
+#   {"view": "logs", "bot_id": "..."}         → logs viewer
+#   {"view": "env",  "bot_id": "...", "env_delete_map": {...}}
+#   {"view": "delete_confirm", "bot_id": "..."}
+#   {"view": "await_env_kv", "bot_id": "...", "prev": "env"}
 USER_STATES: Dict[int, Dict[str, Any]] = {}
 
 
-def ack(call: types.CallbackQuery, text: str = "") -> None:
-    try:
-        bot.answer_callback_query(call.id, text=text)
-    except Exception:
-        pass
-
-
-def safe_edit(chat_id: int, message_id: int, text: str,
-              kb: Optional[types.InlineKeyboardMarkup] = None) -> None:
-    try:
-        bot.edit_message_text(text, chat_id, message_id,
-                              reply_markup=kb, parse_mode="HTML")
-    except ApiTelegramException as e:
-        if "message is not modified" in str(e).lower():
-            return
-        raise
-
-
-# ─── MENUS ───────────────────────────────────────────────────────
-def main_menu_kb() -> types.InlineKeyboardMarkup:
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        types.InlineKeyboardButton(f"▸  {sc('My Bots')}", callback_data="menu_bots"),
-        types.InlineKeyboardButton(f"⊕  {sc('Upload Bot')}", callback_data="menu_upload"),
-    )
-    kb.add(
-        types.InlineKeyboardButton(f"?  {sc('Help')}", callback_data="menu_help"),
-    )
-    return kb
-
-
-def back_main_kb() -> types.InlineKeyboardMarkup:
-    return types.InlineKeyboardMarkup().add(
-        types.InlineKeyboardButton(f"↲  {sc('Main Menu')}", callback_data="menu_main"))
-
-
-def bot_actions_kb(bot_id: str, running: bool,
-                   has_auto: bool = False) -> types.InlineKeyboardMarkup:
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    if running:
-        kb.add(
-            types.InlineKeyboardButton(f"■  {sc('Stop')}", callback_data=f"bot_stop_{bot_id}"),
-            types.InlineKeyboardButton(f"↻  {sc('Restart')}", callback_data=f"bot_restart_{bot_id}"),
-        )
-    else:
-        kb.add(
-            types.InlineKeyboardButton(f"▶  {sc('Start')}", callback_data=f"bot_start_{bot_id}"),
-            types.InlineKeyboardButton(f"↻  {sc('Restart')}", callback_data=f"bot_restart_{bot_id}"),
-        )
-    kb.add(
-        types.InlineKeyboardButton(f"▸  {sc('Live Logs')}", callback_data=f"bot_logs_{bot_id}"),
-        types.InlineKeyboardButton(f"✎  {sc('Env Vars')}", callback_data=f"bot_env_{bot_id}"),
-    )
-    if has_auto:
-        kb.add(types.InlineKeyboardButton(f"↺  {sc('Reset Auto-Install')}",
-                                           callback_data=f"bot_resetauto_{bot_id}"))
-    kb.add(
-        types.InlineKeyboardButton(f"✖  {sc('Delete')}", callback_data=f"bot_delete_{bot_id}"),
-    )
-    kb.add(types.InlineKeyboardButton(f"↲  {sc('My Bots')}", callback_data="menu_bots"))
-    return kb
-
-
-def render_main_menu(chat_id: int, call: Optional[types.CallbackQuery] = None,
-                     intro: Optional[str] = None) -> None:
+# ═════════════════════════════════════════════════════════════════
+#  VIEW RENDERERS (all use reply keyboards)
+# ═════════════════════════════════════════════════════════════════
+def view_main(chat_id: int, intro: Optional[str] = None) -> None:
+    USER_STATES[chat_id] = {"view": "main"}
     bots = list_user_bots(chat_id)
     running = sum(1 for b in bots if b["_id"] in RUNNING
                   and RUNNING[b["_id"]]["proc"].poll() is None)
     intro_block = f"{intro}\n" if intro else ""
-    cap = (
+    text = (
         f"<b>{esc(BRAND)}</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"{intro_block}"
@@ -941,57 +889,54 @@ def render_main_menu(chat_id: int, call: Optional[types.CallbackQuery] = None,
         f"━━━━━━━━━━━━━━━━━━\n"
         f"{sc('Choose an option below')}.{FOOTER}"
     )
-    if call:
-        try:
-            safe_edit(chat_id, call.message.message_id, cap, main_menu_kb())
-            return
-        except Exception:
-            pass
-        try:
-            bot.delete_message(chat_id, call.message.message_id)
-        except Exception:
-            pass
     try:
-        bot.send_message(chat_id, cap, reply_markup=main_menu_kb())
+        bot.send_message(chat_id, text, reply_markup=_main_rkb())
     except Exception as e:
-        print(f"[render_main_menu] {e}", file=sys.stderr)
+        print(f"[view_main] {e}", file=sys.stderr)
 
 
-def render_bots_menu(chat_id: int, call: Optional[types.CallbackQuery] = None) -> None:
+def view_bots(chat_id: int) -> None:
     bots = list_user_bots(chat_id)
-    kb = types.InlineKeyboardMarkup(row_width=1)
+    bot_map: Dict[str, str] = {}
+    rows: List[List[Tuple[str, Optional[str]]]] = []
+
+    if bots:
+        for b in sorted(bots, key=lambda x: x.get("name", "")):
+            running = (b["_id"] in RUNNING
+                       and RUNNING[b["_id"]]["proc"].poll() is None)
+            mark = "▶" if running else "■"
+            label = f"{mark}  {sc(b['name'])[:30]}"
+            if label in bot_map:
+                label = f"{mark}  {sc(b['name'])[:25]}_{b['_id'][:4]}"
+            bot_map[label] = b["_id"]
+            rows.append([(label, "success" if running else "primary")])
+    rows.append([(RB_MAIN, "primary")])
+
+    USER_STATES[chat_id] = {"view": "bots", "bot_map": bot_map}
+
     if not bots:
-        cap = (
+        text = (
             f"<b>▸ {sc('My Bots')}</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"<i>{sc('No bots yet')}.</i>\n"
-            f"{sc('Tap upload to begin')}.{FOOTER}"
+            f"{sc('Tap Upload to begin')}.{FOOTER}"
         )
     else:
-        cap = (
+        text = (
             f"<b>▸ {sc('My Bots')}</b>\n"
             f"━━━━━━━━━━━━━━━━━━\n"
             f"{bullet('Total', len(bots))}\n"
-            f"━━━━━━━━━━━━━━━━━━{FOOTER}"
+            f"{sc('Tap a bot to manage')}.{FOOTER}"
         )
-        for b in sorted(bots, key=lambda x: x.get("name", "")):
-            running = b["_id"] in RUNNING and RUNNING[b["_id"]]["proc"].poll() is None
-            mark = "▶" if running else "■"
-            kb.add(types.InlineKeyboardButton(
-                f"{mark}  {sc(b['name'])[:40]}",
-                callback_data=f"bot_view_{b['_id']}"))
-    kb.add(types.InlineKeyboardButton(f"↲  {sc('Main Menu')}", callback_data="menu_main"))
-    if call:
-        try:
-            safe_edit(chat_id, call.message.message_id, cap, kb)
-            return
-        except Exception:
-            pass
-    bot.send_message(chat_id, cap, reply_markup=kb)
+    try:
+        bot.send_message(chat_id, text, reply_markup=_rkb(rows))
+    except Exception as e:
+        print(f"[view_bots] {e}", file=sys.stderr)
 
 
-def render_upload_menu(chat_id: int, call: Optional[types.CallbackQuery] = None) -> None:
-    cap = (
+def view_upload(chat_id: int) -> None:
+    USER_STATES[chat_id] = {"view": "main"}
+    text = (
         f"<b>⊕ {sc('Upload Bot')}</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"{sc('Send your bot file as a document')}:\n"
@@ -1005,50 +950,46 @@ def render_upload_menu(chat_id: int, call: Optional[types.CallbackQuery] = None)
         f"{sc('Missing modules install automatically on crash')}.\n"
         f"{sc('Bot will auto-start after upload')}.{FOOTER}"
     )
-    if call:
-        try:
-            safe_edit(chat_id, call.message.message_id, cap, back_main_kb())
-            return
-        except Exception:
-            pass
-    bot.send_message(chat_id, cap, reply_markup=back_main_kb())
+    try:
+        bot.send_message(chat_id, text, reply_markup=_main_rkb())
+    except Exception as e:
+        print(f"[view_upload] {e}", file=sys.stderr)
 
 
-def render_help(chat_id: int, call: Optional[types.CallbackQuery] = None) -> None:
-    cap = (
+def view_help(chat_id: int) -> None:
+    USER_STATES[chat_id] = {"view": "main"}
+    text = (
         f"<b>? {sc('Help')}</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"{bullet('Upload', 'Send .py / .js / .zip')}\n"
-        f"{bullet('Run', 'My Bots → pick → Start')}\n"
-        f"{bullet('Logs', 'My Bots → pick → Live Logs')}\n"
-        f"{bullet('Env', 'My Bots → pick → Env Vars')}\n"
-        f"{bullet('Delete', 'My Bots → pick → Delete')}\n"
+        f"{bullet('Run', 'My Bots → tap bot → Start')}\n"
+        f"{bullet('Logs', 'My Bots → tap bot → Live Logs')}\n"
+        f"{bullet('Env', 'My Bots → tap bot → Env Vars')}\n"
+        f"{bullet('Delete', 'My Bots → tap bot → Delete')}\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"{sc('Auto-restart')}: {sc('crashed bots restart automatically')}\n"
         f"{sc('Auto-install')}: {sc('missing pip/npm modules install on crash')}\n"
         f"{sc('Per-bot env vars')}: {sc('set BOT_TOKEN per bot')}.\n"
         f"{sc('Everything is 100% free')}.{FOOTER}"
     )
-    if call:
-        try:
-            safe_edit(chat_id, call.message.message_id, cap, back_main_kb())
-            return
-        except Exception:
-            pass
-    bot.send_message(chat_id, cap, reply_markup=back_main_kb())
+    try:
+        bot.send_message(chat_id, text, reply_markup=_main_rkb())
+    except Exception as e:
+        print(f"[view_help] {e}", file=sys.stderr)
 
 
-def render_bot_view(chat_id: int, bot_id: str,
-                    call: Optional[types.CallbackQuery] = None) -> None:
+def view_bot(chat_id: int, bot_id: str) -> None:
     b = get_bot(bot_id)
     if not b:
-        if call: ack(call, "Not found")
-        return
+        view_bots(chat_id); return
+    USER_STATES[chat_id] = {"view": "bot", "bot_id": bot_id}
+
     info = RUNNING.get(bot_id)
     running = bool(info and info["proc"].poll() is None)
     crashed = b.get("last_exit_code") not in (None, 0)
     status = "▶ Running" if running else ("💥 Crashed" if crashed else "■ Stopped")
     uptime = fmt_dur(int(time.time() * 1000 - info["started"])) if running else "—"
+
     total = 0
     bot_dir = Path(b["dir"])
     if bot_dir.exists():
@@ -1058,7 +999,8 @@ def render_bot_view(chat_id: int, bot_id: str,
                     total += (Path(root) / f).stat().st_size
                 except OSError:
                     pass
-    cap = (
+
+    text = (
         f"<b>{sc('Bot')}: {esc(b['name'])}</b>\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"{bullet('Status', status)}\n"
@@ -1068,83 +1010,105 @@ def render_bot_view(chat_id: int, bot_id: str,
     )
     auto = b.get("auto_installed") or []
     if auto:
-        cap += f"{bullet('Auto-installed', ', '.join(auto[:4]))}\n"
+        text += f"{bullet('Auto-installed', ', '.join(auto[:4]))}\n"
     if not running and b.get("last_error"):
-        cap += (
+        text += (
             f"━━━━━━━━━━━━━━━━━━\n"
             f"<b>Last error:</b>\n"
             f"<pre>{esc(b['last_error'][:600])}</pre>"
         )
-    cap += FOOTER
-    kb = bot_actions_kb(bot_id, running, has_auto=bool(auto))
-    if call:
-        try:
-            safe_edit(chat_id, call.message.message_id, cap, kb)
-            return
-        except Exception:
-            pass
-    bot.send_message(chat_id, cap, reply_markup=kb)
+    text += FOOTER
+
+    rows: List[List[Tuple[str, Optional[str]]]] = []
+    if running:
+        rows.append([(RB_STOP, "danger"), (RB_RESTART, "primary")])
+    else:
+        rows.append([(RB_START, "success"), (RB_RESTART, "primary")])
+    rows.append([(RB_LOGS, "primary"), (RB_ENV, "primary")])
+    rows.append([(RB_DELETE, "danger")])
+    rows.append([(RB_MY_BOTS, "primary"), (RB_MAIN, "primary")])
+
+    try:
+        bot.send_message(chat_id, text, reply_markup=_rkb(rows))
+    except Exception as e:
+        print(f"[view_bot] {e}", file=sys.stderr)
 
 
-def render_env_menu(chat_id: int, bot_id: str,
-                    call: Optional[types.CallbackQuery] = None) -> None:
+def view_env(chat_id: int, bot_id: str) -> None:
     b = get_bot(bot_id)
     if not b:
-        return
+        view_bots(chat_id); return
+
     env = b.get("env") or {}
-    rows = "\n".join(f"• <code>{esc(k)}</code> = <code>{esc(str(v)[:40])}</code>"
-                     for k, v in env.items()) or f"<i>{sc('No vars yet')}</i>"
-    cap = (
+    env_delete_map: Dict[str, str] = {}
+
+    USER_STATES[chat_id] = {
+        "view": "env",
+        "bot_id": bot_id,
+        "env_delete_map": env_delete_map,
+    }
+
+    rows_text = "\n".join(
+        f"• <code>{esc(k)}</code> = <code>{esc(str(v)[:40])}</code>"
+        for k, v in env.items()
+    ) or f"<i>{sc('No vars yet')}</i>"
+
+    text = (
         f"<b>✎ {sc('Env Vars')}</b> — {esc(b['name'])}\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"{rows}\n"
+        f"{rows_text}\n"
         f"━━━━━━━━━━━━━━━━━━\n"
-        f"{sc('Send')} <code>KEY=value</code> {sc('to add or edit')}.\n"
+        f"{sc('Tap Add Variable to create one')}.\n"
+        f"{sc('Tap a ✖ button to delete a var')}.\n"
         f"{sc('Restart bot after changes')}.{FOOTER}"
     )
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton(f"⊕  {sc('Add Variable')}",
-                                       callback_data=f"env_add_{bot_id}"))
+
+    rows: List[List[Tuple[str, Optional[str]]]] = [[(RB_ADD_VAR, "success")]]
     for k in env:
-        kb.add(types.InlineKeyboardButton(f"✖  {k}",
-                                           callback_data=f"env_del_{bot_id}_{k}"))
-    kb.add(types.InlineKeyboardButton(f"↲  {sc('Back')}",
-                                       callback_data=f"bot_view_{bot_id}"))
-    if call:
-        try:
-            safe_edit(chat_id, call.message.message_id, cap, kb)
-            return
-        except Exception:
-            pass
-    bot.send_message(chat_id, cap, reply_markup=kb)
+        label = f"✖  {k}"
+        env_delete_map[label] = k
+        rows.append([(label, "danger")])
+    rows.append([(RB_BACK, "primary")])
+
+    try:
+        bot.send_message(chat_id, text, reply_markup=_rkb(rows))
+    except Exception as e:
+        print(f"[view_env] {e}", file=sys.stderr)
 
 
-def render_logs(chat_id: int, bot_id: str,
-                call: Optional[types.CallbackQuery] = None) -> None:
+def view_logs(chat_id: int, bot_id: str) -> None:
     b = get_bot(bot_id)
     if not b:
-        return
+        view_bots(chat_id); return
+    USER_STATES[chat_id] = {"view": "logs", "bot_id": bot_id}
     logs = tail_log(bot_id, n=60)
-    cap = (
+    text = (
         f"<b>▸ {sc('Live Logs')}</b> — {esc(b['name'])}\n"
         f"━━━━━━━━━━━━━━━━━━\n"
         f"<pre>{esc(logs[-3500:])}</pre>"
         f"━━━━━━━━━━━━━━━━━━{FOOTER}"
     )
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        types.InlineKeyboardButton(f"↻  {sc('Refresh')}",
-                                    callback_data=f"bot_logs_{bot_id}"),
-        types.InlineKeyboardButton(f"↲  {sc('Back')}",
-                                    callback_data=f"bot_view_{bot_id}"),
+    rows = [[(RB_REFRESH, "primary"), (RB_BACK, "success")]]
+    try:
+        bot.send_message(chat_id, text, reply_markup=_rkb(rows))
+    except Exception as e:
+        print(f"[view_logs] {e}", file=sys.stderr)
+
+
+def view_delete_confirm(chat_id: int, bot_id: str) -> None:
+    b = get_bot(bot_id)
+    if not b:
+        view_bots(chat_id); return
+    USER_STATES[chat_id] = {"view": "delete_confirm", "bot_id": bot_id}
+    text = (
+        f"⚠ {sc('Confirm delete')}: <b>{esc(b['name'])}</b>?\n"
+        f"{sc('This cannot be undone')}.{FOOTER}"
     )
-    if call:
-        try:
-            safe_edit(chat_id, call.message.message_id, cap, kb)
-            return
-        except Exception:
-            pass
-    bot.send_message(chat_id, cap, reply_markup=kb)
+    rows = [[(RB_YES_DEL, "danger"), (RB_CANCEL, "success")]]
+    try:
+        bot.send_message(chat_id, text, reply_markup=_rkb(rows))
+    except Exception as e:
+        print(f"[view_delete_confirm] {e}", file=sys.stderr)
 
 
 # ─── OWNER AUTO-CLAIM ────────────────────────────────────────────
@@ -1159,27 +1123,35 @@ def _claim_owner(uid: int) -> None:
         print(f"[owner] auto-claimed by {uid}", flush=True)
 
 
-# ─── HANDLERS ────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════
+#  HANDLERS
+# ═════════════════════════════════════════════════════════════════
 @bot.message_handler(commands=["start", "menu"])
 def cmd_start(m: types.Message) -> None:
     if m.chat.type != "private":
         return
     _claim_owner(m.from_user.id)
-    render_main_menu(m.chat.id,
-                     intro=f"Hello, <b>{esc(m.from_user.first_name or 'friend')}</b>!")
+    view_main(m.chat.id,
+              intro=f"Hello, <b>{esc(m.from_user.first_name or 'friend')}</b>!")
 
 
 @bot.message_handler(commands=["help"])
 def cmd_help(m: types.Message) -> None:
     if m.chat.type != "private":
         return
-    render_help(m.chat.id)
+    view_help(m.chat.id)
 
 
 @bot.message_handler(commands=["cancel"])
 def cmd_cancel(m: types.Message) -> None:
-    USER_STATES.pop(m.from_user.id, None)
-    bot.reply_to(m, f"✓ {sc('Cancelled')}")
+    if m.chat.type != "private":
+        return
+    st = USER_STATES.get(m.from_user.id) or {}
+    if st.get("view") == "await_env_kv":
+        bot_id = st.get("bot_id")
+        if bot_id and get_bot(bot_id):
+            view_env(m.chat.id, bot_id); return
+    view_main(m.chat.id)
 
 
 @bot.message_handler(content_types=["document"])
@@ -1282,7 +1254,6 @@ def on_doc(m: types.Message) -> None:
         return
 
     save_bot(doc_db)
-    USER_STATES.pop(m.from_user.id, None)
     try:
         bot.edit_message_text(
             f"✓ {sc('Bot stored')}: {esc(name)}\n"
@@ -1298,22 +1269,14 @@ def on_doc(m: types.Message) -> None:
         time.sleep(1)
         res = start_bot(bot_id)
         if res.get("ok"):
-            try:
-                bot.edit_message_text(
-                    f"✓ <b>{esc(name)}</b> {sc('is running')}!\n"
-                    f"{bullet('PID', res.get('pid'))}\n"
-                    f"{bullet('Kind', res.get('kind'))}\n"
-                    f"Open {sc('My Bots')} for controls.",
-                    m.chat.id, status.message_id,
-                )
-            except Exception:
-                pass
+            view_bot(m.chat.id, bot_id)
         else:
+            view_main(m.chat.id)
             try:
-                bot.edit_message_text(
+                bot.send_message(
+                    m.chat.id,
                     f"⚠ {sc('Stored but failed to start')}:\n"
                     f"<code>{esc(res.get('error', '?'))}</code>",
-                    m.chat.id, status.message_id,
                 )
             except Exception:
                 pass
@@ -1325,127 +1288,142 @@ def on_text(m: types.Message) -> None:
     if m.chat.type != "private":
         return
     uid = m.from_user.id
-    st = USER_STATES.get(uid) or {}
-    flow = st.get("flow")
     text = (m.text or "").strip()
 
-    if flow == "await_env_kv":
+    # Ignore slash commands (handled above)
+    if text.startswith("/"):
+        return
+
+    st = USER_STATES.get(uid) or {}
+    view = st.get("view", "main")
+
+    # ─── Env var input flow (highest priority) ─────────────
+    if view == "await_env_kv":
         bot_id = st.get("bot_id", "")
+        if text == RB_CANCEL:
+            if bot_id and get_bot(bot_id):
+                view_env(uid, bot_id)
+            else:
+                view_main(uid)
+            return
         if "=" not in text:
-            bot.reply_to(m, f"✖ {sc('Format')}: <code>KEY=VALUE</code>")
+            bot.send_message(uid,
+                             f"✖ {sc('Format')}: <code>KEY=VALUE</code>",
+                             reply_markup=_rkb([[(RB_CANCEL, "danger")]]))
             return
         k, v = text.split("=", 1)
         k, v = k.strip(), v.strip()
         if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", k):
-            bot.reply_to(m, f"✖ {sc('Invalid key')}")
+            bot.send_message(uid, f"✖ {sc('Invalid key')}",
+                             reply_markup=_rkb([[(RB_CANCEL, "danger")]]))
             return
         b = get_bot(bot_id)
         if not b:
-            USER_STATES.pop(uid, None)
-            bot.reply_to(m, "✖ Bot not found")
-            return
+            view_main(uid); return
         env = b.get("env") or {}
         env[k] = v
         b["env"] = env
         save_bot(b)
-        USER_STATES.pop(uid, None)
-        bot.reply_to(m, f"✓ {sc('Saved')} <code>{esc(k)}</code>")
-        render_env_menu(m.chat.id, bot_id)
+        view_env(uid, bot_id)
+        return
 
+    # ─── Global navigation (any view) ──────────────────────
+    if text == RB_MAIN:
+        view_main(uid); return
+    if text == RB_MY_BOTS:
+        view_bots(uid); return
+    if text == RB_UPLOAD:
+        view_upload(uid); return
+    if text == RB_HELP:
+        view_help(uid); return
 
-@bot.callback_query_handler(func=lambda c: True)
-def on_cb(call: types.CallbackQuery) -> None:
-    data = call.data or ""
-    uid = call.from_user.id
-    chat = call.message.chat.id
-    try:
-        if data == "menu_main":
-            ack(call); render_main_menu(chat, call=call); return
-        if data == "menu_bots":
-            ack(call); render_bots_menu(chat, call=call); return
-        if data == "menu_upload":
-            ack(call); render_upload_menu(chat, call=call); return
-        if data == "menu_help":
-            ack(call); render_help(chat, call=call); return
+    # ─── View-specific routing ─────────────────────────────
+    if view == "main":
+        if text == RB_REFRESH:
+            view_main(uid); return
 
-        if data.startswith("bot_view_"):
-            ack(call); render_bot_view(chat, data.split("_", 2)[2], call=call); return
-        if data.startswith("bot_start_"):
-            bid = data.split("_", 2)[2]
-            ack(call, "Starting…")
-            res = start_bot(bid)
-            ack(call, "Started" if res.get("ok") else res.get("error", "?"))
-            render_bot_view(chat, bid, call=call); return
-        if data.startswith("bot_stop_"):
-            bid = data.split("_", 2)[2]
-            ack(call, "Stopping…")
-            stop_bot(bid, manual=True)
-            ack(call, "Stopped")
-            render_bot_view(chat, bid, call=call); return
-        if data.startswith("bot_restart_"):
-            bid = data.split("_", 2)[2]
-            ack(call, "Restarting…")
-            res = restart_bot(bid)
-            ack(call, "Restarted" if res.get("ok") else res.get("error", "?"))
-            render_bot_view(chat, bid, call=call); return
-        if data.startswith("bot_logs_"):
-            ack(call); render_logs(chat, data.split("_", 2)[2], call=call); return
-        if data.startswith("bot_env_"):
-            ack(call); render_env_menu(chat, data.split("_", 2)[2], call=call); return
-        if data.startswith("bot_resetauto_"):
-            bid = data.split("_", 2)[2]
-            b = get_bot(bid)
-            if b:
-                b["auto_installed"] = []
-                b["restart_attempts"] = 0
-                save_bot(b)
-            ack(call, "Auto-install state reset")
-            render_bot_view(chat, bid, call=call); return
-        if data.startswith("env_add_"):
-            bid = data.split("_", 2)[2]
-            USER_STATES[uid] = {"flow": "await_env_kv", "bot_id": bid}
-            ack(call)
-            bot.send_message(chat,
-                             f"✎ {sc('Send env var')}: <code>KEY=VALUE</code>\n"
-                             f"/cancel {sc('to abort')}.")
-            return
-        if data.startswith("env_del_"):
-            parts = data.split("_", 3)
-            if len(parts) >= 4:
-                bid, key = parts[2], parts[3]
-                b = get_bot(bid)
-                if b:
-                    env = b.get("env") or {}
-                    env.pop(key, None)
-                    b["env"] = env
-                    save_bot(b)
-                ack(call, f"Deleted {key}")
-                render_env_menu(chat, bid, call=call)
-            return
-        if data.startswith("bot_delete_"):
-            bid = data.split("_", 2)[2]
-            b = get_bot(bid)
-            if not b:
-                ack(call, "Not found"); return
-            kb = types.InlineKeyboardMarkup(row_width=2)
-            kb.add(
-                types.InlineKeyboardButton("✖  Delete",
-                                             callback_data=f"bot_delyes_{bid}"),
-                types.InlineKeyboardButton("↲  Cancel",
-                                             callback_data=f"bot_view_{bid}"),
-            )
-            ack(call)
+    elif view == "bots":
+        bot_map = st.get("bot_map") or {}
+        if text in bot_map:
+            view_bot(uid, bot_map[text]); return
+
+    elif view == "bot":
+        bot_id = st.get("bot_id", "")
+        if not bot_id or not get_bot(bot_id):
+            view_bots(uid); return
+        if text == RB_START:
             try:
-                safe_edit(chat, call.message.message_id,
-                          f"⚠ {sc('Confirm delete')}: <b>{esc(b['name'])}</b>?", kb)
-            except Exception:
-                pass
+                bot.send_message(uid, f"⏳ {sc('Starting')}…")
+                start_bot(bot_id)
+            finally:
+                view_bot(uid, bot_id)
             return
-        if data.startswith("bot_delyes_"):
-            bid = data.split("_", 2)[2]
-            b = get_bot(bid)
+        if text == RB_STOP:
+            try:
+                bot.send_message(uid, f"⏳ {sc('Stopping')}…")
+                stop_bot(bot_id, manual=True)
+            finally:
+                view_bot(uid, bot_id)
+            return
+        if text == RB_RESTART:
+            try:
+                bot.send_message(uid, f"⏳ {sc('Restarting')}…")
+                restart_bot(bot_id)
+            finally:
+                view_bot(uid, bot_id)
+            return
+        if text == RB_LOGS:
+            view_logs(uid, bot_id); return
+        if text == RB_ENV:
+            view_env(uid, bot_id); return
+        if text == RB_DELETE:
+            view_delete_confirm(uid, bot_id); return
+
+    elif view == "logs":
+        bot_id = st.get("bot_id", "")
+        if not bot_id or not get_bot(bot_id):
+            view_bots(uid); return
+        if text == RB_REFRESH:
+            view_logs(uid, bot_id); return
+        if text == RB_BACK:
+            view_bot(uid, bot_id); return
+
+    elif view == "env":
+        bot_id = st.get("bot_id", "")
+        if not bot_id or not get_bot(bot_id):
+            view_bots(uid); return
+        if text == RB_ADD_VAR:
+            USER_STATES[uid] = {
+                "view": "await_env_kv",
+                "bot_id": bot_id,
+                "prev": "env",
+            }
+            bot.send_message(
+                uid,
+                f"✎ {sc('Send env var')}: <code>KEY=VALUE</code>\n"
+                f"{sc('Tap Cancel to abort')}.",
+                reply_markup=_rkb([[(RB_CANCEL, "danger")]]),
+            )
+            return
+        if text == RB_BACK:
+            view_bot(uid, bot_id); return
+        delete_map = st.get("env_delete_map") or {}
+        if text in delete_map:
+            key = delete_map[text]
+            b = get_bot(bot_id)
             if b:
-                stop_bot(bid, manual=True)
+                env = b.get("env") or {}
+                env.pop(key, None)
+                b["env"] = env
+                save_bot(b)
+            view_env(uid, bot_id); return
+
+    elif view == "delete_confirm":
+        bot_id = st.get("bot_id", "")
+        if text == RB_YES_DEL:
+            b = get_bot(bot_id)
+            if b:
+                stop_bot(bot_id, manual=True)
                 for f in b.get("enc_files", []):
                     try:
                         Path(f["enc_path"]).unlink(missing_ok=True)
@@ -1453,18 +1431,31 @@ def on_cb(call: types.CallbackQuery) -> None:
                         pass
                     wipe_key(f["key_id"])
                 rmrf(b.get("dir", ""))
-                delete_bot_doc(bid)
-            ack(call, "Deleted")
-            render_bots_menu(chat, call=call)
+                delete_bot_doc(bot_id)
+            view_bots(uid); return
+        if text == RB_CANCEL:
+            if bot_id and get_bot(bot_id):
+                view_bot(uid, bot_id)
+            else:
+                view_bots(uid)
             return
 
-        ack(call, "?")
-    except Exception as e:
-        traceback.print_exc()
-        try:
-            bot.send_message(chat, f"✖ Error: <code>{esc(e)}</code>")
-        except Exception:
-            pass
+    # Fallback — unknown text, show main menu
+    view_main(uid)
+
+
+# ─── LEGACY CALLBACK HANDLER (old inline buttons) ──────────────
+@bot.callback_query_handler(func=lambda c: True)
+def on_legacy_cb(call: types.CallbackQuery) -> None:
+    """Old inline buttons from previous deployments — guide user to reply keyboard."""
+    try:
+        bot.answer_callback_query(
+            call.id,
+            "Use the reply keyboard buttons below 👇",
+            show_alert=True,
+        )
+    except Exception:
+        pass
 
 
 # ─── KEEPALIVE ───────────────────────────────────────────────────
