@@ -568,7 +568,7 @@ BRAND       = "ѕιмяαη нoѕтιηg ＲΒOT"
 BRAND_VER   = "v2.1"
 BRAND_TAG   = f"{BRAND} {BRAND_VER}"
 SUPPORT_USR = "@Hdhdjosenrvbr"
-UPDATE_CH   = "https://t.me/+MXtA9ufCgok3Yjc1"
+UPDATE_CH   = "https://t.me/+EfipuvQ7xxc0YTI9"
 FOOTER      = f"\n\n<blockquote>{BRAND_TAG}</blockquote>"
 
 # ─── glyphs (smart contextual symbols + emojis for the UI) ──────
