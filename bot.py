@@ -564,7 +564,7 @@ try:
 except (TypeError, ValueError):
     KEEPALIVE_PORT = 10000
 
-BRAND       = "ʀᴜꜱᴇʀ ᴋɪɴɢ"
+BRAND       = "Rᴋ Hᴏsᴛɪɴɢ Bᴏᴛ"
 BRAND_VER   = "v2.1"
 BRAND_TAG   = f"{BRAND} {BRAND_VER}"
 SUPPORT_USR = "@Hdhdjosenrvbr"
